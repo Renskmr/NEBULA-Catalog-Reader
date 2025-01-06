@@ -1,0 +1,145 @@
+import matplotlib.pyplot as plt
+import matplotlib
+import numpy as np
+import csv
+
+font = {'family': 'serif', 'size': 12}
+matplotlib.rc('font', **font)
+
+
+'''
+_______________________________________________________________________________
+
+Read catalog data
+_______________________________________________________________________________
+'''
+
+
+filename = 'QPO Catalogue (Outburst dates).csv'
+
+lines = []
+
+name = []
+start = []
+end = []
+distance = []
+
+with open(filename, mode ='r') as file:
+    catalog = csv.reader(file, delimiter=';')
+    # skip header
+    next(catalog)
+
+    for line in catalog:
+        n = line[0].replace(u'\xa0', u' ')
+        name.append(n)
+        start.append(line[1])
+        end.append(line[2])
+        distance.append(line[3])
+
+# convert pc to kpc
+distance = [int(i)/1000 for i in distance]
+
+
+# number of outbursts and objects
+print(len(name), 'outbursts currently in catalog')
+name_no_duplicates = list(dict.fromkeys(name))
+num = (len(name_no_duplicates))
+print(num, 'objects currently in catalog')
+
+
+'''
+_______________________________________________________________________________
+
+Data analysis and visulization
+_______________________________________________________________________________
+'''
+
+# effective detector area
+area = 549*10**-4
+
+# calculate flux [keV photons / s] based on typical outburst luminosity [10^30 J / s] and distance [kpc]
+def flux(distance):
+    return (10**30) / (4*np.pi* (distance*3.086*10**19)**2 ) * area * 1/(1.602*10**-16)
+
+# convert date to number
+def date_to_num(date_str):
+    day, month, year = map(int, date_str.split('-'))
+    num = year + (month / 12)
+    return num
+
+start_num = [date_to_num(i) for i in start]
+end_num = [date_to_num(j)+1/12 for j in end]
+
+
+# plot outburst timeline
+fig, ax = plt.subplots(figsize=(10,4), dpi=500)
+
+for i in range(len(start)):
+    ax.plot(
+        [start_num[i], end_num[i]],
+        [flux(distance[i]), flux(distance[i])],
+        linewidth=2,
+        linestyle=':',
+        marker='o',
+        markersize='6',
+        markerfacecolor='skyblue',
+        markeredgecolor='darkblue',
+        color='k'
+    )
+    
+ax.set_xlabel('Year')
+ax.set_ylabel(r'Flux [photons (1keV) s$^{-1}$]') 
+ 
+x_min = 1970
+x_max = 2025
+
+ax.set_xlim(x_min, x_max)
+ax.minorticks_on()
+xticks = np.linspace(1970, 2025, 12)
+ax.set_xticks(xticks)
+
+ax.set_yscale('log')
+ax.set_yticks([10, 100, 1000, 10000, 100000])
+
+plt.tight_layout()
+# plt.savefig('timeline_outburst.pdf')
+plt.show()
+
+
+# calculate the number of outburst happening each year
+def calculate_histogram(start_str, end_str):
+    start_years = [int(date.split('-')[-1]) for date in start_str]
+    end_years = [int(date.split('-')[-1]) for date in end_str]
+
+    year_counts = {}
+
+    for start, end in zip(start_years, end_years):
+        for year in range(start, end + 1):
+            year_counts[year] = year_counts.get(year, 0) + 1
+    
+    return year_counts
+
+# calculate histogram
+histogram = calculate_histogram(start, end)
+
+# sort years for proper display
+years = sorted(histogram.keys())
+counts = [histogram[year] for year in years]
+
+# plot histogram
+fig, ax = plt.subplots(figsize=(10,4), dpi=500)
+ax.tick_params(axis='y', which='minor', left=False)
+
+ax.bar(years, counts, color='#1f77b4', edgecolor='darkblue')
+ax.set_xlabel('Year')
+ax.set_ylabel('Number of Outbursts')
+
+ax.set_xlim(1970, 2025)
+ax.minorticks_on()
+ax.set_xticks(xticks)
+
+ax.set_yticks([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+
+plt.tight_layout()
+# plt.savefig('timeline_histogram.pdf')
+plt.show()
